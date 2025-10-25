@@ -1,8 +1,17 @@
 import { GoogleGenAI, Chat, type GenerateContentResponse, type Content } from '@google/genai';
 import { type Tool, type Approach, type PromptDetails, type ChatMessage } from '../types';
 
-// Initialize the Google Gemini AI client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+let ai: GoogleGenAI;
+
+// Defer the initialization of the GoogleGenAI client until it's first needed.
+// This prevents the app from crashing on load if the API_KEY env var isn't immediately available.
+const getAiClient = () => {
+  if (!ai) {
+    ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  }
+  return ai;
+};
+
 
 const SYSTEM_INSTRUCTION = `You are C2H AI, the official AI assistant for Cradle 2 Harvard International Schools in Abuja, Nigeria. Your primary role is to assist our esteemed teachers with their educational tasks. You should be professional, encouraging, and knowledgeable.
 
@@ -72,7 +81,7 @@ export const generateContent = async (
 ): Promise<string> => {
   try {
     const prompt = generatePrompt(details, tool, approach);
-    const response = await ai.models.generateContent({
+    const response = await getAiClient().models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
@@ -91,7 +100,7 @@ export const generateContent = async (
  * @param history - Optional chat history to restore a session.
  */
 export const createChat = (history?: ChatMessage[]): Chat => {
-  const chat = ai.chats.create({
+  const chat = getAiClient().chats.create({
     model: 'gemini-2.5-flash',
     history: history as Content[],
     config: {
@@ -127,7 +136,7 @@ export const summarizeTopicForTitle = async (topic: string): Promise<string> => 
 Topic: "${topic}"
 
 Title:`;
-        const response = await ai.models.generateContent({
+        const response = await getAiClient().models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
         });
