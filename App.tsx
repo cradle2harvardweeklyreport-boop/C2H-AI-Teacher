@@ -1,5 +1,4 @@
-
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import PromptForm from './components/PromptForm';
@@ -16,7 +15,18 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [outputContent, setOutputContent] = useState<string>('');
-  
+  const [isApiReady, setIsApiReady] = useState(true);
+
+  useEffect(() => {
+    // This check verifies that the API key is present in the client-side environment.
+    // On platforms like Vercel, environment variables must be explicitly exposed to the browser.
+    // If this check fails, it indicates a deployment configuration issue.
+    if (!process.env.API_KEY) {
+      setError("The AI service is not configured correctly. Please ensure the API key is set up in the deployment environment. AI features have been disabled.");
+      setIsApiReady(false);
+    }
+  }, []);
+
   const {
     sessions: chatSessions,
     activeSessionId,
@@ -28,6 +38,7 @@ const App: React.FC = () => {
   } = useChatHistory();
 
   const handlePromptSubmit = async (details: PromptDetails) => {
+    if (!isApiReady) return;
     setIsLoading(true);
     setError(null);
     setOutputContent('');
@@ -46,7 +57,10 @@ const App: React.FC = () => {
     // Clear non-chat output when switching tools
     if (tool.id !== 'chat') {
       setOutputContent('');
-      setError(null);
+      // Keep the API configuration error if it exists
+      if (isApiReady) {
+        setError(null);
+      }
     }
   };
 
@@ -76,7 +90,14 @@ const App: React.FC = () => {
           onDeleteChat={deleteChat}
         />
         <main className="flex-1 flex flex-col bg-white">
-          {selectedTool.id === 'chat' ? (
+          {!isApiReady ? (
+            <div className="flex-1 flex items-center justify-center p-4">
+              <div className="text-center bg-red-50 text-red-800 p-6 rounded-lg shadow-md max-w-lg">
+                <h3 className="font-bold text-lg">Service Not Available</h3>
+                <p className="mt-2 text-sm">{error}</p>
+              </div>
+            </div>
+          ) : selectedTool.id === 'chat' ? (
              <ChatInterface 
                 activeSession={activeChatSession}
                 geminiChat={activeChatInstance}

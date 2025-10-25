@@ -7,6 +7,9 @@ let ai: GoogleGenAI;
 // This prevents the app from crashing on load if the API_KEY env var isn't immediately available.
 const getAiClient = () => {
   if (!ai) {
+    if (!process.env.API_KEY) {
+        throw new Error("API_KEY environment variable not set.");
+    }
     ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   }
   return ai;
@@ -83,7 +86,7 @@ export const generateContent = async (
     const prompt = generatePrompt(details, tool, approach);
     const response = await getAiClient().models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: prompt,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         systemInstruction: SYSTEM_INSTRUCTION
       }
@@ -96,13 +99,26 @@ export const generateContent = async (
 };
 
 /**
+ * Strips application-specific properties from chat messages to prepare them for the Gemini API.
+ * @param history - The array of ChatMessage objects from the application's state.
+ * @returns A new array of objects conforming to the Gemini API's Content type.
+ */
+const formatHistoryForGemini = (history: ChatMessage[]): Content[] => {
+    return history.map(({ role, parts }) => ({
+        role,
+        parts: parts.map(part => ({ text: part.text })) // Ensure parts are correctly formatted too
+    }));
+};
+
+/**
  * Creates a new chat instance with the Gemini model.
  * @param history - Optional chat history to restore a session.
  */
 export const createChat = (history?: ChatMessage[]): Chat => {
+  const formattedHistory = history ? formatHistoryForGemini(history) : undefined;
   const chat = getAiClient().chats.create({
     model: 'gemini-2.5-flash',
-    history: history as Content[],
+    history: formattedHistory,
     config: {
       systemInstruction: SYSTEM_INSTRUCTION
     }
@@ -138,7 +154,7 @@ Topic: "${topic}"
 Title:`;
         const response = await getAiClient().models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: prompt,
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
         });
         return response.text.trim().replace(/["']/g, '');
     } catch (error) {
